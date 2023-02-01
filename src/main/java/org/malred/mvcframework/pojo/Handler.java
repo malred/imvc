@@ -21,6 +21,16 @@ public class Handler {
         this.paramIndexMapping = new HashMap();
     }
 
+    @Override
+    public String toString() {
+        return "Handler{" +
+                "controller=" + controller +
+                ", method=" + method +
+                ", pattern=" + pattern +
+                ", paramIndexMapping=" + paramIndexMapping +
+                '}';
+    }
+
     public Object getController() {
         return controller;
     }

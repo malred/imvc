@@ -1,10 +1,8 @@
 package org.malred.mvcframework.servlet;
 
+import com.google.gson.Gson;
 import org.apache.commons.lang3.StringUtils;
-import org.malred.mvcframework.annotations.iAutowired;
-import org.malred.mvcframework.annotations.iController;
-import org.malred.mvcframework.annotations.iRequestMapping;
-import org.malred.mvcframework.annotations.iService;
+import org.malred.mvcframework.annotations.*;
 import org.malred.mvcframework.pojo.Handler;
 
 import javax.servlet.ServletConfig;
@@ -55,7 +53,10 @@ public class DispatcherServlet extends HttpServlet {
         for (Map.Entry<String, Object> entry : ioc.entrySet()) {
             // 获取ioc中当前遍历的对象的class类型
             Class<?> aClass = entry.getValue().getClass();
-            if (!aClass.isAnnotationPresent(iController.class)) continue;
+            if (!aClass.isAnnotationPresent(iController.class) &&
+                    !aClass.isAnnotationPresent(iRestController.class)) {
+                continue;
+            }
             String baseUrl = "";
             if (aClass.isAnnotationPresent(iRequestMapping.class)) {
                 iRequestMapping annotation = aClass.getAnnotation(iRequestMapping.class);
@@ -134,12 +135,19 @@ public class DispatcherServlet extends HttpServlet {
                 // 反射
                 Class<?> aClass = Class.forName(className); // 根据全类名加载类
                 // 区分controller和*service
-                if (aClass.isAnnotationPresent(iController.class)) {
+                if (aClass.isAnnotationPresent(iController.class) ||
+                        aClass.isAnnotationPresent(iRestController.class)) {
                     // 直接拿首字母小写做为id,保存到ioc
                     String simpleName = aClass.getSimpleName();// DemoController
                     String lowerFirstSimpleName = lowerFirst(simpleName); // demoController
                     Object o = aClass.newInstance();
                     ioc.put(lowerFirstSimpleName, o);
+                    for (Object obj : ioc.values()) {
+                        System.out.println(obj);
+                    }
+                    for (Object obj : ioc.keySet()) {
+                        System.out.println(obj);
+                    }
                 } else if (aClass.isAnnotationPresent(iService.class)) {
                     iService annotation = aClass.getAnnotation(iService.class);
                     // 获取注解的value值
@@ -270,7 +278,24 @@ public class DispatcherServlet extends HttpServlet {
             paramValues[responseIndex] = resp;
         }
         try {
-            handler.getMethod().invoke(handler.getController(), paramValues);
+            Object invoke = handler.getMethod().invoke(handler.getController(), paramValues);
+            System.out.println(handler.getController().getClass().isAnnotationPresent(iRestController.class));
+            // rest返回json
+            if (handler.getController().getClass().isAnnotationPresent(iRestController.class)) {
+                // malred: 返回结果 => 封装方法 => 返回json => restController
+//            resp.getWriter().write(invoke.toString());
+                resp.setHeader("Access-Control-Allow-Origin", "*");
+                resp.setHeader("Cache-Control", "no-cache");
+                resp.setCharacterEncoding("UTF-8");
+                resp.setContentType("application/json");
+                Gson gson = new Gson();
+                String output = gson.toJson(invoke);
+                resp.getWriter().print(output);
+                resp.getWriter().flush();
+            } else {
+                resp.getWriter().print(invoke);
+                resp.getWriter().flush();
+            }
         } catch (IllegalAccessException e) {
             e.printStackTrace();
         } catch (InvocationTargetException e) {
